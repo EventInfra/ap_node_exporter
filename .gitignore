@@ -1,2 +1,4 @@
 node_exp
 *.o
+.lock-waf*
+bin/.waf-*
