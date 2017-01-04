@@ -5,11 +5,10 @@ PKG_VERSION:=0.0.1
 PKG_RELEASE:=1
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/ap-node-exporter-$(PKG_VERSION)
-PKG_SOURCE:=ap-node-exporter-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=@SF/ap-node-exporter
+PKG_SOURCE:=ap-node-exporter-$(PKG_VERSION).tar.xz
+PKG_SOURCE_URL:=http://github.com/synnack/ap-node-exporter
 PKG_MD5SUM:=9b7dc52656f5cbec846a7ba3299f73bd
 PKG_CAT:=zcat
-
 include $(INCLUDE_DIR)/package.mk
 
 define Package/ap-node-exporter
@@ -17,7 +16,8 @@ define Package/ap-node-exporter
   CATEGORY:=Network
   TITLE:=Prometheus AP node exporter
   #DESCRIPTION:=This variable is obsolete. use the Package/name/description define instead!
-  URL:=http://bridge.sourceforge.net/
+  URL:=http://google.com/
+  DEPENDS:=+libnl +libnl-genl +libmicrohttpd
 endef
 
 define Package/bridge/description
