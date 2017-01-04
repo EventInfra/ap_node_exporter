@@ -1,6 +1,6 @@
 .PHONY: all
 all:
-	@bin/waf configure
+	@bin/waf build
 
 .PHONY: clean
 clean:
