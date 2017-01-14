@@ -1,4 +1,4 @@
-# Access Point node exporter
+# Access Point node exporter for Prometheus
 
 Gets STA and survey data from nl80211 API, works on LEDE/OpenWrt.
 
