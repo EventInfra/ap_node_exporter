@@ -47,6 +47,101 @@ static int finish_handler(struct nl_msg *msg, void *arg)
 	return NL_SKIP;
 }
 
+static int survey_dump_handler(struct nl_msg *msg, void *arg)
+{
+	struct nlattr *tb[NL80211_ATTR_MAX + 1];
+	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
+	struct nlattr *sinfo[NL80211_SURVEY_INFO_MAX + 1];
+	struct client_context *ctx = (struct client_context *)arg;
+	FILE *stream = ctx->stream;
+
+	static struct nla_policy survey_policy[NL80211_SURVEY_INFO_MAX + 1] = {
+		[NL80211_SURVEY_INFO_FREQUENCY] = { .type = NLA_U32 },
+		[NL80211_SURVEY_INFO_NOISE] = { .type = NLA_U8 },
+	};
+
+	nla_parse(tb, NL80211_ATTR_MAX, genlmsg_attrdata(gnlh, 0),
+		  genlmsg_attrlen(gnlh, 0), NULL);
+
+	char dev[IFNAMSIZ];
+	if_indextoname(nla_get_u32(tb[NL80211_ATTR_IFINDEX]), dev);
+
+	if (!tb[NL80211_ATTR_SURVEY_INFO]) {
+		fprintf(stderr, "survey data missing!\n");
+		return NL_SKIP;
+	}
+
+	if (nla_parse_nested(sinfo, NL80211_SURVEY_INFO_MAX,
+			     tb[NL80211_ATTR_SURVEY_INFO],
+			     survey_policy)) {
+		fprintf(stderr, "failed to parse nested attributes!\n");
+		return NL_SKIP;
+	}
+	bool active_freq = 0;
+	uint32_t cur_freq = 0;
+	if (sinfo[NL80211_SURVEY_INFO_FREQUENCY]) {
+		if (sinfo[NL80211_SURVEY_INFO_IN_USE]) {
+			active_freq = 1;
+		}
+		cur_freq = nla_get_u32(sinfo[NL80211_SURVEY_INFO_FREQUENCY]);
+	} else {
+		return NL_SKIP;
+	}
+	if (sinfo[NL80211_SURVEY_INFO_NOISE]) {
+		fprintf(stream, "wlan_survey_channel_noise_dbm{device=\"%s\",frequency=%d} %d\n",
+				dev, cur_freq, (int8_t)nla_get_u8(sinfo[NL80211_SURVEY_INFO_NOISE]));
+	}
+	if (sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME]) {
+		fprintf(stream, "wlan_survey_channel_active_ms{device=\"%s\",frequency=%d} %ju\n",
+				dev, cur_freq, (uintmax_t)nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME]));
+	}
+	if (sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_BUSY]) {
+		fprintf(stream, "wlan_survey_channel_busy_ms{device=\"%s\",frequency=%d} %ju\n",
+				dev, cur_freq, (uintmax_t)nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_BUSY]));
+	}
+	if (sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_EXT_BUSY]) {
+		fprintf(stream, "wlan_survey_channel_ext_busy_ms{device=\"%s\",frequency=%d} %ju\n",
+				dev, cur_freq, (uintmax_t)nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_EXT_BUSY]));
+	}
+	if (sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_RX]) {
+		fprintf(stream,"wlan_survey_channel_rx_time_ms{device=\"%s\",frequency=%d} %ju\n",
+				dev, cur_freq, (uintmax_t)nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_RX]));
+	}
+	if (sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_TX]) {
+		fprintf(stream, "wlan_survey_channel_tx_time_ms{device=\"%s\",frequency=%d} %ju\n",
+				dev, cur_freq, (uintmax_t)nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_TX]));
+	}
+	if (active_freq) {
+		fprintf(stream, "wlan_active_frequency{device=\"%s\"} %ju\n",
+				dev, (uintmax_t)cur_freq);
+		if (sinfo[NL80211_SURVEY_INFO_NOISE]) {
+			fprintf(stream, "wlan_active_channel_noise_dbm{device=\"%s\"} %d\n",
+					dev, (int8_t)nla_get_u8(sinfo[NL80211_SURVEY_INFO_NOISE]));
+		}
+		if (sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME]) {
+			fprintf(stream, "wlan_active_channel_active_ms{device=\"%s\"} %ju\n",
+					dev, (uintmax_t)nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME]));
+		}
+		if (sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_BUSY]) {
+			fprintf(stream, "wlan_active_channel_busy_ms{device=\"%s\"} %ju\n",
+					dev, (uintmax_t)nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_BUSY]));
+		}
+		if (sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_EXT_BUSY]) {
+			fprintf(stream, "wlan_active_channel_ext_busy_ms{device=\"%s\"} %ju\n",
+					dev, (uintmax_t)nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_EXT_BUSY]));
+		}
+		if (sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_RX]) {
+			fprintf(stream,"wlan_active_channel_rx_time_ms{device=\"%s\"} %ju\n",
+					dev, (uintmax_t)nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_RX]));
+		}
+		if (sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_TX]) {
+			fprintf(stream, "wlan_active_channel_tx_time_ms{device=\"%s\"} %ju\n",
+					dev, (uintmax_t)nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_TX]));
+		}
+	}
+	return NL_SKIP;
+}
+
 static void print_bss_param(struct nlattr *bss_param_attr, FILE *stream, char *dev, char *sta)
 {
 	struct nlattr *info[NL80211_STA_BSS_PARAM_MAX + 1];
@@ -102,7 +197,6 @@ static void print_tid_stats(struct nlattr *tid_stats_attr, FILE *stream, char *d
 			fprintf(stderr, "failed to parse nested stats attributes!");
 			return;
 		}
-		info = stats_info[NL80211_TID_STATS_RX_MSDU];
 		if (stats_info[NL80211_TID_STATS_RX_MSDU]) {
 			fprintf(stream, "wlan_station_tid_rx_msdu{device=\"%s\",station=\"%s\",tid=%d} %ju\n",
 					dev, sta, i, (uintmax_t)nla_get_u64(stats_info[NL80211_TID_STATS_RX_MSDU]));
@@ -115,7 +209,6 @@ static void print_tid_stats(struct nlattr *tid_stats_attr, FILE *stream, char *d
 			fprintf(stream, "wlan_station_tid_tx_msdu_retries{device=\"%s\",station=\"%s\",tid=%d} %ju\n",
 					dev, sta, i, (uintmax_t)nla_get_u64(stats_info[NL80211_TID_STATS_TX_MSDU_RETRIES]));
 		}
-		info = stats_info[NL80211_TID_STATS_TX_MSDU_FAILED];
 		if (stats_info[NL80211_TID_STATS_TX_MSDU_FAILED]) {
 			fprintf(stream, "wlan_station_tid_tx_msdu_failed{device=\"%s\",station=\"%s\",tid=%d} %ju\n",
 					dev, sta, i, (uintmax_t)nla_get_u64(stats_info[NL80211_TID_STATS_TX_MSDU_FAILED]));
@@ -260,7 +353,7 @@ static int station_dump_handler(struct nl_msg *msg, void *arg)
 	FILE *stream = ctx->stream;
 
 	if (sinfo[NL80211_STA_INFO_CONNECTED_TIME]) {
-		fprintf(stream, "wlan_station_connected_time{device=\"%s\",station=\"%s\"} %ju\n",
+		fprintf(stream, "wlan_station_connected_time_s{device=\"%s\",station=\"%s\"} %ju\n",
 				dev, sta, (uintmax_t)nla_get_u32(sinfo[NL80211_STA_INFO_CONNECTED_TIME]));
 	}
 	if (sinfo[NL80211_STA_INFO_INACTIVE_TIME]) {
@@ -303,7 +396,7 @@ static int station_dump_handler(struct nl_msg *msg, void *arg)
 				dev, sta, (uintmax_t)nla_get_u32(sinfo[NL80211_STA_INFO_BEACON_LOSS]));
 	}
 	if (sinfo[NL80211_STA_INFO_BEACON_RX]) {
-		fprintf(stream, "wlan_station_rx_beacon{device=\"%s\",station=\"%s\"} %ju\n",
+		fprintf(stream, "wlan_station_rx_beacons{device=\"%s\",station=\"%s\"} %ju\n",
 				dev, sta, (uintmax_t)nla_get_u32(sinfo[NL80211_STA_INFO_BEACON_RX]));
 	}
 	if (sinfo[NL80211_STA_INFO_RX_DROP_MISC]) {
@@ -311,23 +404,23 @@ static int station_dump_handler(struct nl_msg *msg, void *arg)
 				dev, sta, (uintmax_t)nla_get_u32(sinfo[NL80211_STA_INFO_RX_DROP_MISC]));
 	}
 
-	print_chain_signal(sinfo[NL80211_STA_INFO_CHAIN_SIGNAL], "wlan_station_chain_signal", stream, dev, sta);
+	print_chain_signal(sinfo[NL80211_STA_INFO_CHAIN_SIGNAL], "wlan_station_chain_signal_dbm", stream, dev, sta);
 	if (sinfo[NL80211_STA_INFO_SIGNAL]) {
-		fprintf(stream, "wlan_station_signal{device=\"%s\",station=\"%s\"} %d\n",
+		fprintf(stream, "wlan_station_signal_dbm{device=\"%s\",station=\"%s\"} %d\n",
 				dev, sta, (int8_t)nla_get_u8(sinfo[NL80211_STA_INFO_SIGNAL]));
 	}
-	print_chain_signal(sinfo[NL80211_STA_INFO_CHAIN_SIGNAL_AVG], "wlan_station_chain_signal_avg", stream, dev, sta);
+	print_chain_signal(sinfo[NL80211_STA_INFO_CHAIN_SIGNAL_AVG], "wlan_station_chain_signal_avg_dbm", stream, dev, sta);
 	if (sinfo[NL80211_STA_INFO_SIGNAL_AVG]) {
-		fprintf(stream, "wlan_station_signal_avg{device=\"%s\",station=\"%s\"} %d\n",
+		fprintf(stream, "wlan_station_signal_avg_dbm{device=\"%s\",station=\"%s\"} %d\n",
 				dev, sta, (int8_t)nla_get_u8(sinfo[NL80211_STA_INFO_SIGNAL_AVG]));
 	}
 
 	if (sinfo[NL80211_STA_INFO_BEACON_SIGNAL_AVG]) {
-		fprintf(stream, "wlan_station_beacon_signal_avg{device=\"%s\",station=\"%s\"} %d\n",
+		fprintf(stream, "wlan_station_beacon_signal_avg_dbm{device=\"%s\",station=\"%s\"} %d\n",
 				dev, sta, (int8_t)nla_get_u8(sinfo[NL80211_STA_INFO_SIGNAL_AVG]));
 	}
 	if (sinfo[NL80211_STA_INFO_T_OFFSET]) {
-		fprintf(stream, "wlan_station_time_offset{device=\"%s\",station=\"%s\"} %jd\n",
+		fprintf(stream, "wlan_station_time_offset_ms{device=\"%s\",station=\"%s\"} %jd\n",
 				dev, sta, (intmax_t)nla_get_u64(sinfo[NL80211_STA_INFO_T_OFFSET]));
 	}
 
@@ -346,7 +439,7 @@ static int station_dump_handler(struct nl_msg *msg, void *arg)
 
 	if (sinfo[NL80211_STA_INFO_EXPECTED_THROUGHPUT]) {
 		fprintf(stream, "wlan_station_expected_throughput{device=\"%s\",station=\"%s\"} %jd\n",
-				dev, sta, (uintmax_t)nla_get_u32(sinfo[NL80211_STA_INFO_EXPECTED_THROUGHPUT])*1000);
+				dev, sta, (uintmax_t)nla_get_u32(sinfo[NL80211_STA_INFO_EXPECTED_THROUGHPUT]) * 1000);
 	}
 
 	if (sinfo[NL80211_STA_INFO_STA_FLAGS]) {
@@ -447,40 +540,71 @@ int show_metrics(FILE *stream) {
 	nlmsg_free(msg);
 	nl_cb_put(cb);
 
+	for (int i = 0; i < ctx.if_count; i++) {
+		/* Allocate new message */
+		msg = nlmsg_alloc();
+		if (!msg) {
+			fprintf(stderr, "Failed to allocate netlink message.\n");
+			nl_socket_free(ctx.nls);
+			return -ENOMEM;
+		}
+		cb = nl_cb_alloc(NL_CB_CUSTOM);
+		if (!cb) {
+			fprintf(stderr, "Failed to allocate netlink callback.\n");
+			nlmsg_free(msg);
+			nl_socket_free(ctx.nls);
+			return -ENOMEM;
+		}
 
-	/* Maybe wait here */
-	struct nl_msg *out_msg = nlmsg_alloc();
-	if (!out_msg) {
-		fprintf(stderr, "Failed to allocate netlink message.\n");
-		nl_socket_free(ctx.nls);
-		return -ENOMEM;
+		/* Send a GET_STATION command */
+		nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, station_dump_handler, &ctx);
+		genlmsg_put(msg, 0, 0, ctx.nl80211_id, 0, NLM_F_DUMP, NL80211_CMD_GET_STATION, 0);
+		nla_put_u32(msg, NL80211_ATTR_IFINDEX, ctx.if_index[i]);
+		nl_send_auto_complete(ctx.nls, msg);
+
+
+		/* Wait for shit to finish */
+		err = 1;
+		nl_cb_set(cb, NL_CB_FINISH, NL_CB_CUSTOM, finish_handler, &err);
+		while (err > 0)
+			nl_recvmsgs(ctx.nls, cb);
+
+		/* Free the shite */
+		nlmsg_free(msg);
+		nl_cb_put(cb);
+	
+		/* Allocate new message */
+		msg = nlmsg_alloc();
+		if (!msg) {
+			fprintf(stderr, "Failed to allocate netlink message.\n");
+			nl_socket_free(ctx.nls);
+			return -ENOMEM;
+		}
+		cb = nl_cb_alloc(NL_CB_CUSTOM);
+		if (!cb) {
+			fprintf(stderr, "Failed to allocate netlink callback.\n");
+			nlmsg_free(msg);
+			nl_socket_free(ctx.nls);
+			return -ENOMEM;
+		}
+
+		/* Send a GET_SURVEY command */
+		nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, survey_dump_handler, &ctx);
+		genlmsg_put(msg, 0, 0, ctx.nl80211_id, 0, NLM_F_DUMP, NL80211_CMD_GET_SURVEY, 0);
+		nla_put_u32(msg, NL80211_ATTR_IFINDEX, ctx.if_index[i]);
+		nl_send_auto_complete(ctx.nls, msg);
+
+
+		/* Wait for shit to finish */
+		err = 1;
+		nl_cb_set(cb, NL_CB_FINISH, NL_CB_CUSTOM, finish_handler, &err);
+		while (err > 0)
+			nl_recvmsgs(ctx.nls, cb);
+
+		/* Free the shite */
+		nlmsg_free(msg);
+		nl_cb_put(cb);
 	}
-	cb = nl_cb_alloc(NL_CB_CUSTOM);
-	if (!cb) {
-		fprintf(stderr, "Failed to allocate netlink callback.\n");
-		nlmsg_free(out_msg);
-		nl_socket_free(ctx.nls);
-		return -ENOMEM;
-	}
-
-	/* Send a GET_STATION command */
-	nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, station_dump_handler, &ctx);
-	genlmsg_put(out_msg, 0, 0, ctx.nl80211_id, 0, NLM_F_DUMP, NL80211_CMD_GET_STATION, 0);
-	nla_put_u32(out_msg, NL80211_ATTR_IFINDEX, ctx.if_index[0]);
-	nl_send_auto_complete(ctx.nls, out_msg);
-
-
-	/* Wait for shit to finish */
-	err = 1;
-	nl_cb_set(cb, NL_CB_FINISH, NL_CB_CUSTOM, finish_handler, &err);
-	while (err > 0)
-		nl_recvmsgs(ctx.nls, cb);
-
-	/* Free the shite */
-	nlmsg_free(out_msg);
-	nl_cb_put(cb);
-
-
 	nl_socket_free(ctx.nls);
 	return 0;
 }
@@ -600,7 +724,7 @@ int main (int argc, char **argv)
 	start_listen(NULL, "9100", fd, 2);
 	int epollfd = epoll_create1(0);
 	for (int i = 0; i < 2; i++) {
-		struct epoll_event ev;
+		struct epoll_event ev = {0};
 		ev.events = EPOLLIN;
 		ev.data.fd = fd[i];
 		int rv = epoll_ctl(epollfd, EPOLL_CTL_ADD, fd[i], &ev);
@@ -609,14 +733,14 @@ int main (int argc, char **argv)
 		}
 	}
 	for(;;) {
-		struct epoll_event events[10];
+		struct epoll_event events[10] = {0};
 		int nfds = epoll_wait(epollfd, events, 10, -1);
 		if (nfds == -1) {
 			fprintf(stderr, "epoll wait failed: %s", strerror(errno));
 		}
 		for (int i = 0; i < nfds; i++) {
-			union my_sockaddr addr;
-			socklen_t addrlen;
+			union my_sockaddr addr = {0};
+			socklen_t addrlen = {0};
 			int conn_sock = accept(events[i].data.fd, &addr.addr, &addrlen);
 			if (conn_sock < 0) {
 				fprintf(stderr, "Accept failed: %s", strerror(errno));
@@ -626,7 +750,7 @@ int main (int argc, char **argv)
 			if (stream == NULL) {
 				printf("Error: %s\n", strerror(errno));
 			}
-			if (!fork()) { http_handler(stream); exit(0); }
+			if (!fork()) { http_handler(stream); fclose(stream); exit(0); }
 			fclose(stream);
 		}
 	}
