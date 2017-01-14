@@ -26,3 +26,7 @@ coverity:
 .PHONY: cppcheck
 cppcheck:
 	@cppcheck --std=c11 *.[ch]
+
+.PHONY: ctags
+ctags:
+	@ctags -R .
