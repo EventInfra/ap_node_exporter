@@ -37,6 +37,7 @@ struct client_context {
 	struct nl_sock *nls;
 	int if_count;
 	int if_index[16];
+	uint32_t if_num_sta[16];
 };
 
 static int finish_handler(struct nl_msg *msg, void *arg)
@@ -342,6 +343,7 @@ static int station_dump_handler(struct nl_msg *msg, void *arg)
 	}
 	char dev[IFNAMSIZ];
 	if_indextoname(nla_get_u32(tb_msg[NL80211_ATTR_IFINDEX]), dev);
+
 	char sta[ETH_ALEN*3];
 	snprintf(sta, ETH_ALEN*3, "%02x:%02x:%02x:%02x:%02x:%02x",
 			((uint8_t *)nla_data(tb_msg[NL80211_ATTR_MAC]))[0],
@@ -351,6 +353,19 @@ static int station_dump_handler(struct nl_msg *msg, void *arg)
 			((uint8_t *)nla_data(tb_msg[NL80211_ATTR_MAC]))[4],
 			((uint8_t *)nla_data(tb_msg[NL80211_ATTR_MAC]))[5]);
 	FILE *stream = ctx->stream;
+
+	int ifpos = -1;
+	for (int i = 0;i < ctx->if_count; i++) {
+		if (ctx->if_index[i] == nla_get_u32(tb_msg[NL80211_ATTR_IFINDEX])) {
+			ifpos = i;
+			break;
+		}
+	}
+	if (ifpos == -1) {
+		fprintf(stderr, "Failed to find this interface in the context.\n");
+		return NL_SKIP;
+	}
+	ctx->if_num_sta[ifpos]++;
 
 	if (sinfo[NL80211_STA_INFO_CONNECTED_TIME]) {
 		fprintf(stream, "wlan_station_connected_time_s{device=\"%s\",station=\"%s\"} %ju\n",
@@ -604,6 +619,12 @@ int show_metrics(FILE *stream) {
 		/* Free the shite */
 		nlmsg_free(msg);
 		nl_cb_put(cb);
+	}
+	for (int i = 0; i < ctx.if_count; i++) {
+		char dev[IFNAMSIZ];
+		if_indextoname(ctx.if_index[i], dev);
+		fprintf(stream, "wlan_num_stations{device=\"%s\"} %ju\n",
+			dev, (uintmax_t)ctx.if_num_sta[i]);
 	}
 	nl_socket_free(ctx.nls);
 	return 0;
