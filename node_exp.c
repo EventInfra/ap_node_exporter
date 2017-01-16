@@ -497,9 +497,18 @@ static int list_interface_handler(struct nl_msg *in_msg, void *arg)
 	nla_parse(tb_msg, NL80211_ATTR_MAX, genlmsg_attrdata(gnlh, 0),
 			genlmsg_attrlen(gnlh, 0), NULL);
 
-	if (tb_msg[NL80211_ATTR_IFINDEX]) {
-		ctx->if_index[ctx->if_count] = nla_get_u32(tb_msg[NL80211_ATTR_IFINDEX]);
-		ctx->if_count++;
+	if (!tb_msg[NL80211_ATTR_IFINDEX]) {
+		return NL_SKIP;
+	}
+	ctx->if_index[ctx->if_count] = nla_get_u32(tb_msg[NL80211_ATTR_IFINDEX]);
+	ctx->if_count++;
+	
+	char dev[IFNAMSIZ];
+	if_indextoname(nla_get_u32(tb_msg[NL80211_ATTR_IFINDEX]), dev);
+	if (tb_msg[NL80211_ATTR_WIPHY_TX_POWER_LEVEL]) {
+		uint32_t txp = nla_get_u32(tb_msg[NL80211_ATTR_WIPHY_TX_POWER_LEVEL]);
+		fprintf(ctx->stream, "wlan_interface_tx_power_dbm{device=\"%s\"} %ju.%ju\n",
+				dev, (intmax_t)txp / 100, (uintmax_t)txp % 100);
 	}
 
 	return NL_SKIP;
@@ -711,7 +720,6 @@ static void start_listen(char *node, char *service, int *fd, int max_fd)
 				perror("Failed setsockopt");
 			}
 		} else if (p->ai_family == AF_INET) {
-			char str[INET_ADDRSTRLEN];
 			inet_ntop(AF_INET, &((struct sockaddr_in *)p->ai_addr)->sin_addr, address, INET6_ADDRSTRLEN);
 			printf("IPv4 Address %s:%d\n", address, ntohs(((struct sockaddr_in *)p->ai_addr)->sin_port));
 		}
