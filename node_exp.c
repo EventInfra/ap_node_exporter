@@ -1,5 +1,4 @@
 #include <net/if.h>
-#include <linux/nl80211.h>
 #include <linux/if_ether.h>
 #include <arpa/inet.h>
 #include <sys/epoll.h>
@@ -14,6 +13,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
+
+#include "nl80211.h"
 
 #define ROOTPAGE  "<html><head><title>Metrics exporter</title></head><body><ul><li><a href=\"/metrics\">metrics</a></li></ul></body></html>"
 #define NOT_FOUND_ERROR "<html><head><title>Document not found</title></head><body><h1>404 - Document not found</h1></body></html>"
