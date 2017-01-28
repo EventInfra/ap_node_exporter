@@ -45,7 +45,7 @@ struct client_context {
 	int nl80211_id;
 	struct nl_sock *nls;
 	int if_count;
-	int if_index[16];
+	uint32_t if_index[16];
 	uint32_t if_num_sta[16];
 };
 
@@ -766,13 +766,13 @@ int main (int argc, char **argv)
 		}
 	}
 	for(;;) {
-		struct epoll_event events[10] = {0};
+		struct epoll_event events[10] = {{0}};
 		int nfds = epoll_wait(epollfd, events, 10, -1);
 		if (nfds == -1) {
 			fprintf(stderr, "epoll wait failed: %s", strerror(errno));
 		}
 		for (int i = 0; i < nfds; i++) {
-			union my_sockaddr addr = {0};
+			union my_sockaddr addr = {{0}};
 			socklen_t addrlen = {0};
 			int conn_sock = accept(events[i].data.fd, &addr.addr, &addrlen);
 			if (conn_sock < 0) {
