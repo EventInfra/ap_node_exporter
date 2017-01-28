@@ -39,15 +39,6 @@
 
 #define BIT(x) (1ULL<<(x))
 
-struct bitrate {
-	uint32_t rate;
-	uint8_t vht_nss;
-	uint8_t channel_width;
-	uint8_t mcs;
-	uint8_t vht_mcs;
-	bool short_gi;
-};
-
 
 struct client_context {
 	FILE *stream;
@@ -201,7 +192,7 @@ static void print_bss_param(struct nlattr *bss_param_attr, FILE *stream, char *d
 
 static void print_tid_stats(struct nlattr *tid_stats_attr, FILE *stream, char *dev, char *sta)
 {
-	struct nlattr *stats_info[NL80211_TID_STATS_MAX + 1], *tidattr, *info;
+	struct nlattr *stats_info[NL80211_TID_STATS_MAX + 1], *tidattr;
 	static struct nla_policy stats_policy[NL80211_TID_STATS_MAX + 1] = {
 		[NL80211_TID_STATS_RX_MSDU] = { .type = NLA_U64 },
 		[NL80211_TID_STATS_TX_MSDU] = { .type = NLA_U64 },
@@ -238,7 +229,6 @@ static void print_tid_stats(struct nlattr *tid_stats_attr, FILE *stream, char *d
 
 static void print_bitrate(struct nlattr *bitrate_attr, const char *direction, FILE *stream, char *dev, char *sta)
 {
-	int rate = 0;
 	struct nlattr *rinfo[NL80211_RATE_INFO_MAX + 1];
 	static struct nla_policy rate_policy[NL80211_RATE_INFO_MAX + 1] = {
 		[NL80211_RATE_INFO_BITRATE] = { .type = NLA_U16 },
@@ -299,10 +289,7 @@ static void print_bitrate(struct nlattr *bitrate_attr, const char *direction, FI
 static void print_chain_signal(struct nlattr *attr_list, char *metric_name, FILE *stream, char *dev, char *sta)
 {
 	struct nlattr *attr;
-	static char buf[64];
-	char *cur = buf;
 	int i = 0, rem;
-	const char *prefix;
 
 	if (!attr_list)
 		return;
@@ -466,12 +453,12 @@ static int station_dump_handler(struct nl_msg *msg, void *arg)
 	}
 
 	if (sinfo[NL80211_STA_INFO_RX_DURATION]) {
-		fprintf(stream, "wlan_station_rx_duration{device=\"%s\",station=\"%s\"} %jd\n",
+		fprintf(stream, "wlan_station_rx_duration{device=\"%s\",station=\"%s\"} %ju\n",
 				dev, sta, (uintmax_t)nla_get_u64(sinfo[NL80211_STA_INFO_RX_DURATION]));
 	}
 
 	if (sinfo[NL80211_STA_INFO_EXPECTED_THROUGHPUT]) {
-		fprintf(stream, "wlan_station_expected_throughput{device=\"%s\",station=\"%s\"} %jd\n",
+		fprintf(stream, "wlan_station_expected_throughput{device=\"%s\",station=\"%s\"} %ju\n",
 				dev, sta, (uintmax_t)nla_get_u32(sinfo[NL80211_STA_INFO_EXPECTED_THROUGHPUT]) * 1000);
 	}
 
@@ -510,7 +497,6 @@ static int list_interface_handler(struct nl_msg *in_msg, void *arg)
 	struct nlattr *tb_msg[NL80211_ATTR_MAX + 1];
 	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(in_msg));
 	struct client_context *ctx = (struct client_context *)arg;
-	uint32_t if_index;
 
 	nla_parse(tb_msg, NL80211_ATTR_MAX, genlmsg_attrdata(gnlh, 0),
 			genlmsg_attrlen(gnlh, 0), NULL);
@@ -525,8 +511,8 @@ static int list_interface_handler(struct nl_msg *in_msg, void *arg)
 	if_indextoname(nla_get_u32(tb_msg[NL80211_ATTR_IFINDEX]), dev);
 	if (tb_msg[NL80211_ATTR_WIPHY_TX_POWER_LEVEL]) {
 		uint32_t txp = nla_get_u32(tb_msg[NL80211_ATTR_WIPHY_TX_POWER_LEVEL]);
-		fprintf(ctx->stream, "wlan_interface_tx_power_dbm{device=\"%s\"} %ju.%ju\n",
-				dev, (intmax_t)txp / 100, (uintmax_t)txp % 100);
+		fprintf(ctx->stream, "wlan_interface_tx_power_dbm{device=\"%s\"} %jd.%ju\n",
+				dev, (intmax_t)(txp / 100), (uintmax_t)(txp % 100));
 	}
 
 	return NL_SKIP;
