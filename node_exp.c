@@ -98,27 +98,27 @@ static int survey_dump_handler(struct nl_msg *msg, void *arg)
 		return NL_SKIP;
 	}
 	if (sinfo[NL80211_SURVEY_INFO_NOISE]) {
-		fprintf(stream, "wlan_survey_channel_noise_dbm{device=\"%s\",frequency=%d} %d\n",
+		fprintf(stream, "wlan_survey_channel_noise_dbm{device=\"%s\",frequency=%u} %d\n",
 				dev, cur_freq, (int8_t)nla_get_u8(sinfo[NL80211_SURVEY_INFO_NOISE]));
 	}
 	if (sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME]) {
-		fprintf(stream, "wlan_survey_channel_active_ms{device=\"%s\",frequency=%d} %ju\n",
+		fprintf(stream, "wlan_survey_channel_active_ms{device=\"%s\",frequency=%u} %ju\n",
 				dev, cur_freq, (uintmax_t)nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME]));
 	}
 	if (sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_BUSY]) {
-		fprintf(stream, "wlan_survey_channel_busy_ms{device=\"%s\",frequency=%d} %ju\n",
+		fprintf(stream, "wlan_survey_channel_busy_ms{device=\"%s\",frequency=%u} %ju\n",
 				dev, cur_freq, (uintmax_t)nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_BUSY]));
 	}
 	if (sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_EXT_BUSY]) {
-		fprintf(stream, "wlan_survey_channel_ext_busy_ms{device=\"%s\",frequency=%d} %ju\n",
+		fprintf(stream, "wlan_survey_channel_ext_busy_ms{device=\"%s\",frequency=%u} %ju\n",
 				dev, cur_freq, (uintmax_t)nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_EXT_BUSY]));
 	}
 	if (sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_RX]) {
-		fprintf(stream,"wlan_survey_channel_rx_time_ms{device=\"%s\",frequency=%d} %ju\n",
+		fprintf(stream,"wlan_survey_channel_rx_time_ms{device=\"%s\",frequency=%u} %ju\n",
 				dev, cur_freq, (uintmax_t)nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_RX]));
 	}
 	if (sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_TX]) {
-		fprintf(stream, "wlan_survey_channel_tx_time_ms{device=\"%s\",frequency=%d} %ju\n",
+		fprintf(stream, "wlan_survey_channel_tx_time_ms{device=\"%s\",frequency=%u} %ju\n",
 				dev, cur_freq, (uintmax_t)nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_TX]));
 	}
 	if (active_freq) {
@@ -152,7 +152,7 @@ static int survey_dump_handler(struct nl_msg *msg, void *arg)
 	return NL_SKIP;
 }
 
-static void print_bss_param(struct nlattr *bss_param_attr, FILE *stream, char *dev, char *sta)
+static void print_bss_param(struct nlattr *bss_param_attr, FILE *stream, const char *dev, const char *sta)
 {
 	struct nlattr *info[NL80211_STA_BSS_PARAM_MAX + 1];
 	static struct nla_policy bss_policy[NL80211_STA_BSS_PARAM_MAX + 1] = {
@@ -190,7 +190,7 @@ static void print_bss_param(struct nlattr *bss_param_attr, FILE *stream, char *d
 	}
 }
 
-static void print_tid_stats(struct nlattr *tid_stats_attr, FILE *stream, char *dev, char *sta)
+static void print_tid_stats(struct nlattr *tid_stats_attr, FILE *stream, const char *dev, const char *sta)
 {
 	struct nlattr *stats_info[NL80211_TID_STATS_MAX + 1], *tidattr;
 	static struct nla_policy stats_policy[NL80211_TID_STATS_MAX + 1] = {
@@ -227,7 +227,7 @@ static void print_tid_stats(struct nlattr *tid_stats_attr, FILE *stream, char *d
 	}
 }
 
-static void print_bitrate(struct nlattr *bitrate_attr, const char *direction, FILE *stream, char *dev, char *sta)
+static void print_bitrate(struct nlattr *bitrate_attr, const char *direction, FILE *stream, const char *dev, const char *sta)
 {
 	struct nlattr *rinfo[NL80211_RATE_INFO_MAX + 1];
 	static struct nla_policy rate_policy[NL80211_RATE_INFO_MAX + 1] = {
@@ -276,7 +276,7 @@ static void print_bitrate(struct nlattr *bitrate_attr, const char *direction, FI
 	fprintf(stream, "wlan_station_%s_bitrate_channel_width{device=\"%s\",station=\"%s\"} %u\n",
 			direction, dev, sta, channel_width);
 
-	fprintf(stream, "wlan_station_%s_bitrate_short_gi{device=\"%s\",station=\"%s\"} %u\n",
+	fprintf(stream, "wlan_station_%s_bitrate_short_gi{device=\"%s\",station=\"%s\"} %d\n",
 			direction, dev, sta, rinfo[NL80211_RATE_INFO_SHORT_GI] ? 1 : 0);
 
 	if (rinfo[NL80211_RATE_INFO_VHT_NSS]) {
@@ -286,7 +286,7 @@ static void print_bitrate(struct nlattr *bitrate_attr, const char *direction, FI
 }
 
 
-static void print_chain_signal(struct nlattr *attr_list, char *metric_name, FILE *stream, char *dev, char *sta)
+static void print_chain_signal(struct nlattr *attr_list, const char *metric_name, FILE *stream, const char *dev, const char *sta)
 {
 	struct nlattr *attr;
 	int i = 0, rem;
@@ -690,8 +690,26 @@ static void http_handler(FILE *stream) {
 }
 
 /* Generic TCP server set-up with multiple sockets */
-static void start_listen(char *node, char *service, int *fd, int max_fd)
+static void start_listen(const char *node, const char *service, int *fd, int max_fd)
 {
+	/* This union fixes the broking casting sockaddr API with strict aliasing rules.
+	 *
+	 * It also takes care of alignment problems that may result in issues on
+	 * non-intel platforms.
+	 *
+	 * This construct is explicitly correct since C99:
+	 * "If the member used to access the contents of a union object is not the same
+	 * as the member last used to store a value in the object, the appropriate
+	 * part of the object representation of the value is reinterpreted as an object
+	 * representation in the new type as described in 6.2.6 (a process sometimes
+	 * called "type punning")"
+	 */
+	union {
+		struct sockaddr sa;
+		struct sockaddr_in sa_in;
+		struct sockaddr_in6 sa_in6;
+		struct sockaddr_storage sa_stor;
+	} u;
 	struct addrinfo hints, *res, *p;
 	int numfds = 0;
 
@@ -717,15 +735,17 @@ static void start_listen(char *node, char *service, int *fd, int max_fd)
 			perror("Failed setsockopt");
 		}
 		if (p->ai_family == AF_INET6) {
-			inet_ntop(AF_INET6, &((struct sockaddr_in6 *)p->ai_addr)->sin6_addr, address, INET6_ADDRSTRLEN);
-			printf("IPv6 Address [%s]:%d\n", address, ntohs(((struct sockaddr_in *)p->ai_addr)->sin_port));
+			u.sa = *p->ai_addr;
+			inet_ntop(AF_INET6, &u.sa_in6.sin6_addr, address, INET6_ADDRSTRLEN);
+			printf("IPv6 Address [%s]:%d\n", address, ntohs(u.sa_in6.sin6_port));
 			rv = setsockopt(listenfd, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&enable, sizeof(enable));
 			if (rv < 0) {
 				perror("Failed setsockopt");
 			}
 		} else if (p->ai_family == AF_INET) {
-			inet_ntop(AF_INET, &((struct sockaddr_in *)p->ai_addr)->sin_addr, address, INET6_ADDRSTRLEN);
-			printf("IPv4 Address %s:%d\n", address, ntohs(((struct sockaddr_in *)p->ai_addr)->sin_port));
+			u.sa = *p->ai_addr;
+			inet_ntop(AF_INET, &u.sa_in.sin_addr, address, INET6_ADDRSTRLEN);
+			printf("IPv4 Address %s:%d\n", address, ntohs(u.sa_in.sin_port));
 		}
 		if (bind(listenfd, p->ai_addr, p->ai_addrlen) < 0) {
 			fprintf(stderr, "bind() error for %s: %s\n", address, strerror(errno));
