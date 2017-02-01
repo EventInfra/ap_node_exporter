@@ -466,19 +466,19 @@ static int station_dump_handler(struct nl_msg *msg, void *arg)
 		struct nl80211_sta_flag_update *sta_flags = (struct nl80211_sta_flag_update *)
 			    nla_data(sinfo[NL80211_STA_INFO_STA_FLAGS]);
 
-		fprintf(stream, "wlan_station_authorized{device=\"%s\",station=\"%s\"} %u\n",
+		fprintf(stream, "wlan_station_authorized{device=\"%s\",station=\"%s\"} %d\n",
 				dev, sta, !!(sta_flags->set & BIT(NL80211_STA_FLAG_AUTHORIZED)));
-		fprintf(stream, "wlan_station_authenticated{device=\"%s\",station=\"%s\"} %u\n",
+		fprintf(stream, "wlan_station_authenticated{device=\"%s\",station=\"%s\"} %d\n",
 				dev, sta, !!(sta_flags->set & BIT(NL80211_STA_FLAG_AUTHENTICATED)));
-		fprintf(stream, "wlan_station_associated{device=\"%s\",station=\"%s\"} %u\n",
+		fprintf(stream, "wlan_station_associated{device=\"%s\",station=\"%s\"} %d\n",
 				dev, sta, !!(sta_flags->set & BIT(NL80211_STA_FLAG_ASSOCIATED)));
-		fprintf(stream, "wlan_station_short_preamble{device=\"%s\",station=\"%s\"} %u\n",
+		fprintf(stream, "wlan_station_short_preamble{device=\"%s\",station=\"%s\"} %d\n",
 				dev, sta, !!(sta_flags->set & BIT(NL80211_STA_FLAG_SHORT_PREAMBLE)));
-		fprintf(stream, "wlan_station_wme{device=\"%s\",station=\"%s\"} %u\n",
+		fprintf(stream, "wlan_station_wme{device=\"%s\",station=\"%s\"} %d\n",
 				dev, sta, !!(sta_flags->set & BIT(NL80211_STA_FLAG_WME)));
-		fprintf(stream, "wlan_station_mfp{device=\"%s\",station=\"%s\"} %u\n",
+		fprintf(stream, "wlan_station_mfp{device=\"%s\",station=\"%s\"} %d\n",
 				dev, sta, !!(sta_flags->set & BIT(NL80211_STA_FLAG_MFP)));
-		fprintf(stream, "wlan_station_tdls_peer{device=\"%s\",station=\"%s\"} %u\n",
+		fprintf(stream, "wlan_station_tdls_peer{device=\"%s\",station=\"%s\"} %d\n",
 				dev, sta, !!(sta_flags->set & BIT(NL80211_STA_FLAG_TDLS_PEER)));
 	}
 
@@ -561,8 +561,17 @@ int show_metrics(FILE *stream) {
 	/* Wait for shit to finish */
 	int err = 1;
 	nl_cb_set(cb, NL_CB_FINISH, NL_CB_CUSTOM, finish_handler, &err);
-	while (err > 0)
-		nl_recvmsgs(ctx.nls, cb);
+	while (err > 0) {
+		int rv = nl_recvmsgs(ctx.nls, cb);
+		if (rv != 0) {
+			fprintf(stderr, "Failed to receive netlink message: %s", strerror(-rv));
+
+			/* Free the shite */
+			nlmsg_free(msg);
+			nl_cb_put(cb);
+			return rv;
+		}
+	}
 
 	/* Free the shite */
 	nlmsg_free(msg);
@@ -594,8 +603,17 @@ int show_metrics(FILE *stream) {
 		/* Wait for shit to finish */
 		err = 1;
 		nl_cb_set(cb, NL_CB_FINISH, NL_CB_CUSTOM, finish_handler, &err);
-		while (err > 0)
-			nl_recvmsgs(ctx.nls, cb);
+		while (err > 0) {
+			int rv = nl_recvmsgs(ctx.nls, cb);
+			if (rv != 0) {
+				fprintf(stderr, "Failed to receive netlink message: %s", strerror(-rv));
+
+				/* Free the shite */
+				nlmsg_free(msg);
+				nl_cb_put(cb);
+				return rv;
+			}
+		}
 
 		/* Free the shite */
 		nlmsg_free(msg);
@@ -626,8 +644,17 @@ int show_metrics(FILE *stream) {
 		/* Wait for shit to finish */
 		err = 1;
 		nl_cb_set(cb, NL_CB_FINISH, NL_CB_CUSTOM, finish_handler, &err);
-		while (err > 0)
-			nl_recvmsgs(ctx.nls, cb);
+		while (err > 0) {
+			int rv = nl_recvmsgs(ctx.nls, cb);
+			if (rv != 0) {
+				fprintf(stderr, "Failed to receive netlink message: %s", strerror(-rv));
+
+				/* Free the shite */
+				nlmsg_free(msg);
+				nl_cb_put(cb);
+				return rv;
+			}
+		}
 
 		/* Free the shite */
 		nlmsg_free(msg);
@@ -801,7 +828,9 @@ int main (int argc, char **argv)
 			}
 			FILE *stream = fdopen(conn_sock, "r+");
 			if (stream == NULL) {
-				printf("Error: %s\n", strerror(errno));
+				fprintf(stderr, "fdopen error: %s\n", strerror(errno));
+				close(conn_sock);
+				continue;
 			}
 			if (!fork()) { http_handler(stream); fclose(stream); exit(0); }
 			fclose(stream);
