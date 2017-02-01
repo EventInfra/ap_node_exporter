@@ -17,6 +17,8 @@ def configure(cnf):
 	cnf.env.CFLAGS.append('-Wcast-align')
 	cnf.env.CFLAGS.append('-fstrict-aliasing')
 	cnf.env.CFLAGS.append('-Wstrict-aliasing')
+	cnf.env.CFLAGS.append('-Wshadow')
+
 	# Security-specific flags
 	cnf.env.CFLAGS.append('-fPIE')
 	cnf.env.CFLAGS.append('-fPIC')

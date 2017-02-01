@@ -693,7 +693,7 @@ static void http_handler(FILE *stream) {
 	/* Read the other headers */
 	for (;;) {
 		char header[1024];
-		char *rv = fgets(header, sizeof(header) - 1, stream);
+		rv = fgets(header, sizeof(header) - 1, stream);
 		if (rv != header) {
 			fprintf(stderr, "fgets error: %s\n", strerror(errno));
 			return;
