@@ -820,7 +820,7 @@ int main (int argc, char **argv)
 		}
 		for (int i = 0; i < nfds; i++) {
 			union my_sockaddr addr = {{0}};
-			socklen_t addrlen = {0};
+			socklen_t addrlen = 0;
 			int conn_sock = accept(events[i].data.fd, &addr.addr, &addrlen);
 			if (conn_sock < 0) {
 				fprintf(stderr, "Accept failed: %s", strerror(errno));
