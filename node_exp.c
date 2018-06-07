@@ -703,12 +703,12 @@ static void http_handler(FILE *stream) {
 		}
 	}
 	if (strcmp(request_uri, "/") == 0) {
-		fprintf(stream, "HTTP/1.0 200 OK\r\nContent-Length: %lu\r\n\r\n", strlen(ROOTPAGE));
+		fprintf(stream, "HTTP/1.0 200 OK\r\nContent-Length: %lu\r\n\r\n", (unsigned long)strlen(ROOTPAGE));
 		fputs(ROOTPAGE, stream);
 		return;
 	}
 	if (strcmp(request_uri, "/metrics") != 0) {
-		fprintf(stream, "HTTP/1.0 404 Not Found\r\nContent-Length: %lu\r\n\r\n", strlen(NOT_FOUND_ERROR));
+		fprintf(stream, "HTTP/1.0 404 Not Found\r\nContent-Length: %lu\r\n\r\n", (unsigned long)strlen(NOT_FOUND_ERROR));
 		fputs(NOT_FOUND_ERROR, stream);
 		return;
 	}
